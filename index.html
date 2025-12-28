@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Polo Gaming - La Rioja</title>
+    
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FF0033",
+                        "cyber-black": "#050505",
+                        "cyber-gray": "#111111",
+                        "neon-red": "#FF0033",
+                        "glass-border": "rgba(255, 0, 51, 0.2)"
+                    },
+                    fontFamily: {
+                        "pixel": ["'Press Start 2P'", "cursive"],
+                        "modern": ["'Orbitron'", "sans-serif"],
+                        "body": ["'Space Grotesk'", "sans-serif"],
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #050505;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .pixel-font { font-family: 'Press Start 2P', cursive; }
+        .modern-font { font-family: 'Orbitron', sans-serif; }
+
+        .glass {
+            background: rgba(17, 17, 17, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 0, 51, 0.2);
+        }
+
+        .cyber-card {
+            background: #0a0a0a;
+            border: 2px solid #1a1a1a;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .cyber-card:hover {
+            border-color: #FF0033;
+            box-shadow: 0 0 30px rgba(255, 0, 51, 0.15);
+            transform: translateY(-5px);
+        }
+
+        @keyframes logo-pulse {
+            0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 5px #FF0033); }
+            50% { transform: scale(1.08); filter: brightness(1.3) drop-shadow(0 0 15px #FF0033); }
+            100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 5px #FF0033); }
+        }
+        .animate-logo {
+            animation: logo-pulse 3s infinite ease-in-out;
+            transform-origin: center;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        .animate-scanline {
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes crt-on {
+          0% { transform: scale(1, 0.01) translate(0, 0); filter: brightness(3); opacity: 0; }
+          100% { transform: scale(1, 1) translate(0, 0); filter: brightness(1); opacity: 1; }
+        }
+        .animate-crt-on {
+          animation: crt-on 0.4s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+        }
+
+        .scanlines::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 15px rgba(255, 0, 51, 0.6);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #FF0033; }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #FF0033; border-radius: 4px; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
+    "three": "https://esm.sh/three@^0.182.0",
+    "three/": "https://esm.sh/three@^0.182.0/"
+  }
+}
+</script>
+</head>
+<body class="bg-cyber-black text-white min-h-screen scanlines">
+    <div id="root"></div>
+</body>
+</html>

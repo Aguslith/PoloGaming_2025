@@ -1,0 +1,8 @@
+{
+  "name": "Polo Gaming Hub Pro",
+  "description": "An advanced gaming ecosystem platform featuring AI-powered PC building assistants, skill trees, and professional game development insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
