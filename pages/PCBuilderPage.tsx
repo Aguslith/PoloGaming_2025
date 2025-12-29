@@ -11,60 +11,48 @@ interface BuildParts {
   ram: string;
   psu: string;
   ssd: string;
+  monitor: string;
+  peripheral: string;
 }
 
 const PCBuilderPage: React.FC = () => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([
-    { role: 'model', text: 'SISTEMA DE ASISTENCIA POLO ONLINE. ¿QUÉ BUILD TIENES EN MENTE?' }
+    { role: 'model', text: 'POLO ARCHITECT SYSTEM v2. LISTO PARA ANALIZAR TU SETUP COMPLETO.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [show3D, setShow3D] = useState(false);
   const [parts, setParts] = useState<BuildParts>({
-    cpu: 'Pendiente',
-    gpu: 'Pendiente',
-    mb: 'Pendiente',
-    ram: 'Pendiente',
-    psu: 'Pendiente',
-    ssd: 'Pendiente'
+    cpu: 'Pendiente', gpu: 'Pendiente', mb: 'Pendiente', ram: 'Pendiente', psu: 'Pendiente', ssd: 'Pendiente', monitor: 'Pendiente', peripheral: 'Pendiente'
   });
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const draft = localStorage.getItem('POLO_DRAFT_BUILD');
+    if (draft) {
+      const parsed = JSON.parse(draft);
+      setParts(prev => ({ ...prev, ...Object.fromEntries(Object.entries(parsed).map(([k,v]) => [k, v || 'Pendiente'])) }));
+      localStorage.removeItem('POLO_DRAFT_BUILD');
+      setMessages(prev => [...prev, { role: 'model', text: '¡LISTO CHANGO! TRAJE TODO LO QUE ELEGISTE EN EL MARKET. ¿HACEMOS UN SCAN DE COMPATIBILIDAD?' }]);
+    }
+  }, []);
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const parseBuildData = (text: string) => {
-    const jsonMatch = text.match(/\[BUILD_JSON\](.*?)\[\/BUILD_JSON\]/s);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        const buildData = JSON.parse(jsonMatch[1]);
-        setParts(prev => ({ ...prev, ...buildData }));
-      } catch (e) {
-        console.error("Error parsing build JSON", e);
-      }
-    }
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
-    const userText = input;
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
+  const handleSend = async (customPrompt?: string) => {
+    const textToSend = customPrompt || input;
+    if (!textToSend.trim() || loading) return;
+    
+    if (!customPrompt) setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: textToSend }]);
     setLoading(true);
 
     try {
-      const prompt = `Act as an 8-bit themed PC architect from "Polo Tecnológico La Rioja". User wants: "${userText}". 
-      Recommend parts and specs in a retro gaming style.
-      IMPORTANT: ALWAYS include a JSON block at the very end of your response formatted exactly like this:
-      [BUILD_JSON]{ "cpu": "NAME", "gpu": "NAME", "mb": "NAME", "ram": "NAME", "psu": "NAME", "ssd": "NAME" }[/BUILD_JSON]
-      Respond in Spanish. If you don't know a part yet, preserve current values.`;
-      
-      const response = await geminiService.getChatResponse(prompt, messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })));
-      const cleanedText = (response || "").replace(/\[BUILD_JSON\].*?\[\/BUILD_JSON\]/s, '').trim();
-      
-      setMessages(prev => [...prev, { role: 'model', text: cleanedText || "ERROR_SISTEMA" }]);
+      const response = await geminiService.getChatResponse(textToSend, messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })));
+      setMessages(prev => [...prev, { role: 'model', text: response || "ERROR_SYSTEM" }]);
       if (response) parseBuildData(response);
     } catch (e) {
       setMessages(prev => [...prev, { role: 'model', text: "ERROR_CONEXION" }]);
@@ -73,256 +61,168 @@ const PCBuilderPage: React.FC = () => {
     }
   };
 
+  const getIAAdvice = async () => {
+    setLoading(true);
+    try {
+      const advice = await geminiService.getCompatibilityAdvice(parts);
+      setMessages(prev => [...prev, { role: 'model', text: advice || "FALLA" }]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'model', text: "ERROR_IA" }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const parseBuildData = (text: string) => {
+    const jsonMatch = text.match(/\[BUILD_JSON\](.*?)\[\/BUILD_JSON\]/s);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        const buildData = JSON.parse(jsonMatch[1]);
+        setParts(prev => ({ ...prev, ...buildData }));
+      } catch (e) { console.error(e); }
+    }
+  };
+
   return (
-    <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-white px-4 py-4 gap-4">
-      {/* Sidebar - Dynamically updated parts */}
-      <aside className="hidden lg:flex flex-col w-80 pixel-border p-6 space-y-8 bg-white overflow-y-auto">
-        <h2 className="text-[10px] font-pixel text-primary border-b-4 border-black pb-4">TERMINAL.LOG</h2>
-        <div className="space-y-6">
-          <div className="p-4 bg-slate-100 border-4 border-black">
-             <div className="flex justify-between items-center mb-3">
-                <span className="text-[8px] font-pixel text-slate-500 uppercase">OS</span>
-                <span className="text-[8px] font-pixel text-primary">RUNNING</span>
-             </div>
-             <p className="text-[10px] font-body text-black">MONITOR DE HARDWARE ACTIVO.</p>
-          </div>
-          
-          <div className="space-y-4 pt-2">
-             <StatusItem icon="memory" label="CPU" val={parts.cpu} />
-             <StatusItem icon="view_in_ar" label="GPU" val={parts.gpu} />
-             <StatusItem icon="developer_board" label="MB" val={parts.mb} />
-             <StatusItem icon="analytics" label="RAM" val={parts.ram} />
-             <StatusItem icon="power" label="PSU" val={parts.psu} />
-             <StatusItem icon="storage" label="SSD" val={parts.ssd} />
-          </div>
+    <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-circuit-black px-4 py-4 gap-4">
+      {/* Sidebar - Ahora con Scroll y más slots */}
+      <aside className="hidden lg:flex flex-col w-96 pixel-border !bg-circuit-black border-inferno-red p-6 space-y-6 overflow-y-auto custom-scrollbar">
+        <header className="flex items-center gap-4 border-b-4 border-inferno-red pb-4">
+           <span className="material-symbols-outlined text-voltage-yellow !text-3xl">terminal</span>
+           <h2 className="text-[10px] font-pixel text-heat-white uppercase">CONFIGURACIÓN</h2>
+        </header>
+        
+        <div className="space-y-3">
+          <PartSlot icon="memory" label="CPU" val={parts.cpu} color="#DC2626" />
+          <PartSlot icon="view_in_ar" label="GPU" val={parts.gpu} color="#F97316" />
+          <PartSlot icon="developer_board" label="MOTHER" val={parts.mb} color="#FACC15" />
+          <PartSlot icon="analytics" label="RAM" val={parts.ram} color="#FAFAFA" />
+          <PartSlot icon="power" label="PSU" val={parts.psu} color="#DC2626" />
+          <PartSlot icon="storage" label="SSD" val={parts.ssd} color="#F97316" />
+          <PartSlot icon="monitor" label="MONITOR" val={parts.monitor} color="#3B82F6" />
+          <PartSlot icon="mouse" label="PERIFÉRICOS" val={parts.peripheral} color="#22C55E" />
         </div>
 
-        <button 
-          onClick={() => setShow3D(true)}
-          className="mt-auto pixel-button !w-full !flex !items-center !justify-center gap-2"
-        >
-          <span className="material-symbols-outlined">3d_rotation</span>
-          VER 3D BUILD
-        </button>
+        <div className="pt-4 space-y-3">
+          <button onClick={getIAAdvice} disabled={loading} className="pixel-button !bg-voltage-yellow !text-black !w-full !py-3 flex items-center justify-center gap-2">
+            <span className="material-symbols-outlined">psychology</span>
+            <span className="text-[8px]">ANALIZAR COMPATIBILIDAD</span>
+          </button>
+          <button onClick={() => setShow3D(true)} className="pixel-button !bg-inferno-red !w-full !py-3 flex items-center justify-center gap-2">
+            <span className="material-symbols-outlined">3d_rotation</span>
+            <span className="text-[8px]">VER SETUP 3D</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Terminal */}
-      <main className="flex-1 flex flex-col pixel-border !bg-white">
-        <header className="px-6 py-4 border-b-8 border-black flex items-center justify-between bg-primary text-white">
-          <div className="flex items-center gap-4">
-             <div className="size-6 bg-white border-2 border-black"></div>
-             <h1 className="text-[10px] font-pixel">POLO_BUILDER_V2.0</h1>
-          </div>
-        </header>
-
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 font-body text-sm bg-white">
+      <main className="flex-1 flex flex-col pixel-border !bg-circuit-black border-lava-orange">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-10 space-y-8">
           {messages.map((m, idx) => (
             <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-xl p-4 border-4 shadow-[4px_4px_0_0_#000] ${
-                m.role === 'user' ? 'border-primary bg-primary text-white' : 'border-black bg-white text-black'
+              <div className={`max-w-xl p-6 border-4 shadow-[8px_8px_0_0_#000] ${
+                m.role === 'user' ? 'border-inferno-red bg-inferno-red text-white' : 'border-lava-orange bg-circuit-black text-heat-white'
               }`}>
-                <div className="whitespace-pre-wrap font-pixel text-[8px] leading-relaxed">{m.text}</div>
+                <div className="whitespace-pre-wrap font-cyber text-sm leading-relaxed">{m.text}</div>
               </div>
             </div>
           ))}
-          {loading && (
-             <div className="flex justify-start">
-               <div className="text-[10px] font-pixel text-primary animate-pulse">CARGANDO...</div>
-             </div>
-          )}
+          {loading && <div className="text-[10px] font-pixel text-voltage-yellow animate-pulse p-6">SISTEMA_PROCESANDO...</div>}
         </div>
 
-        <div className="p-6 border-t-8 border-black">
+        <div className="p-8 border-t-8 border-lava-orange bg-black/40">
           <div className="flex gap-4">
             <input 
               type="text" 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="COMANDO..."
-              className="flex-1 bg-white border-4 border-black px-4 py-3 outline-none text-black font-pixel text-[10px] focus:border-primary"
+              placeholder="PREGUNTALE AL ARQUITECTO RIOJANO..."
+              className="flex-1 bg-circuit-black border-4 border-lava-orange px-6 py-4 outline-none text-heat-white font-cyber text-lg focus:border-voltage-yellow"
             />
-            <button onClick={handleSend} disabled={loading} className="pixel-button">SEND</button>
+            <button onClick={() => handleSend()} disabled={loading} className="pixel-button !bg-voltage-yellow !text-black !px-12">SEND</button>
           </div>
         </div>
       </main>
 
-      {/* 3D Visualizer Modal */}
-      {show3D && <PC3DViewer parts={parts} onClose={() => setShow3D(false)} />}
+      {show3D && <PC3DVisualizer parts={parts} onClose={() => setShow3D(false)} />}
     </div>
   );
 };
 
-const StatusItem = ({ icon, label, val }: { icon: string, label: string, val: string }) => (
-  <div className="flex items-center gap-3">
-    <div className={`size-8 border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] ${val !== 'Pendiente' ? 'bg-primary text-white' : 'bg-slate-200 text-slate-400'}`}>
-       <span className="material-symbols-outlined !text-sm">{icon}</span>
+const PartSlot = ({ icon, label, val, color }: { icon: string, label: string, val: string, color: string }) => {
+  const active = val !== 'Pendiente';
+  return (
+    <div className={`p-3 border-2 transition-all ${active ? 'bg-heat-white/5' : 'border-heat-white/5 opacity-40'}`} style={{ borderColor: active ? color : '' }}>
+       <div className="flex items-center gap-2 mb-1">
+          <span className="material-symbols-outlined !text-lg" style={{ color: active ? color : '#555' }}>{icon}</span>
+          <span className="text-[6px] font-pixel text-heat-white/40">{label}</span>
+       </div>
+       <div className="text-[8px] font-pixel text-heat-white truncate">{val}</div>
     </div>
-    <div className="overflow-hidden">
-      <div className="text-[7px] font-pixel text-slate-500 uppercase">{label}</div>
-      <div className="text-[8px] font-pixel text-black truncate">{val}</div>
-    </div>
-  </div>
-);
+  );
+};
 
-const PC3DViewer: React.FC<{ parts: BuildParts, onClose: () => void }> = ({ parts, onClose }) => {
+const PC3DVisualizer: React.FC<{ parts: BuildParts, onClose: () => void }> = ({ parts, onClose }) => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mountRef.current) return;
-
     const width = mountRef.current.clientWidth;
     const height = mountRef.current.clientHeight;
-
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-    camera.position.set(6, 6, 12);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    scene.background = new THREE.Color(0x09090B);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.set(15, 12, 18);
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1); // Maintain pixelated look
     mountRef.current.appendChild(renderer.domElement);
-
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const dLight = new THREE.DirectionalLight(0xff0000, 1.2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dLight = new THREE.DirectionalLight(0xffffff, 1);
     dLight.position.set(10, 10, 10);
     scene.add(dLight);
-
+    
     const group = new THREE.Group();
     scene.add(group);
 
-    const createBoxPart = (w: number, h: number, d: number, color: number, name: string, pos: [number, number, number], transparent = false) => {
+    const createVoxel = (w: number, h: number, d: number, color: number, pos: [number, number, number]) => {
       const geometry = new THREE.BoxGeometry(w, h, d);
-      const material = new THREE.MeshStandardMaterial({ 
-        color, 
-        transparent, 
-        opacity: transparent ? 0.3 : 1,
-        roughness: 1,
-        metalness: 0
-      });
+      const material = new THREE.MeshStandardMaterial({ color });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(...pos);
-      mesh.userData = { label: name };
-      
-      const edges = new THREE.EdgesGeometry(geometry);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
-      mesh.add(line);
-      
       group.add(mesh);
-      return mesh;
     };
 
-    // Case
-    createBoxPart(4, 6, 6, 0xffffff, "Gabinete: Mid Tower", [0, 0, 0], true);
-    // Motherboard
-    createBoxPart(0.2, 5, 5, 0x1a1a1a, `Motherboard: ${parts.mb}`, [-1.8, 0, 0]);
-    // CPU Cooler (Pixelated Block)
-    createBoxPart(1.2, 1.2, 1.2, 0xcc0000, `CPU: ${parts.cpu}`, [-1.1, 1, 0]);
-    // GPU
-    createBoxPart(3, 1, 4, 0x000000, `GPU: ${parts.gpu}`, [0, -1, 0]);
-    // RAM
-    createBoxPart(0.4, 3, 0.2, 0xff0000, `RAM: ${parts.ram}`, [-1.2, 1, 1.5]);
-    createBoxPart(0.4, 3, 0.2, 0xff0000, `RAM: ${parts.ram}`, [-1.2, 1, 1.8]);
-    // PSU
-    createBoxPart(2, 2, 2, 0x111111, `PSU: ${parts.psu}`, [1, -2, 2]);
-
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    const onMouseMove = (event: MouseEvent) => {
-      if (!mountRef.current) return;
-      const rect = mountRef.current.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(group.children, true);
-
-      if (intersects.length > 0) {
-        let target = intersects[0].object;
-        while(target.parent && !target.userData.label && target.parent !== group) {
-            target = target.parent;
-        }
-        if (target.userData.label) {
-            setHoveredLabel(target.userData.label);
-        } else {
-            setHoveredLabel(null);
-        }
-      } else {
-        setHoveredLabel(null);
-      }
-    };
-
-    const handleResize = () => {
-        if (!mountRef.current) return;
-        const newW = mountRef.current.clientWidth;
-        const newH = mountRef.current.clientHeight;
-        camera.aspect = newW / newH;
-        camera.updateProjectionMatrix();
-        renderer.setSize(newW, newH);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('resize', handleResize);
+    // Gabinete
+    createVoxel(6, 8, 8, 0x111111, [0, 0, 0]);
+    // Monitor
+    if (parts.monitor !== 'Pendiente') createVoxel(8, 5, 0.2, 0x3B82F6, [0, 0, 6]);
+    // Periféricos
+    if (parts.peripheral !== 'Pendiente') createVoxel(6, 0.1, 2, 0x22C55E, [0, -3.5, 6]);
 
     const animate = () => {
       requestAnimationFrame(animate);
+      group.rotation.y += 0.005;
       controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
     return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('resize', handleResize);
       if (mountRef.current && renderer.domElement) mountRef.current.removeChild(renderer.domElement);
       renderer.dispose();
     };
   }, [parts]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
-      <div className="pixel-border !bg-white w-full max-w-5xl h-[85vh] flex flex-col relative animate-crt-on">
-        <header className="bg-primary p-4 border-b-8 border-black flex items-center justify-between text-white">
-           <span className="font-pixel text-[10px] tracking-widest">POLO_3D_BUILD_VISUALIZER</span>
-           <button onClick={onClose} className="material-symbols-outlined hover:rotate-90 transition-transform">close</button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95">
+      <div className="pixel-border !bg-circuit-black border-inferno-red w-full max-w-5xl h-[80vh] flex flex-col">
+        <header className="bg-inferno-red p-4 flex items-center justify-between text-white font-pixel text-[10px]">
+           <span>VISTA_DEL_SETU_v2.0</span>
+           <button onClick={onClose} className="material-symbols-outlined">close</button>
         </header>
-        
-        <div className="flex-1 relative bg-black overflow-hidden" ref={mountRef}>
-           <div className="absolute top-6 left-6 p-4 bg-white/10 border-2 border-white/20 font-pixel text-[7px] text-white/60 space-y-2 pointer-events-none z-10">
-              <p className="text-primary font-bold">INSTRUCCIONES:</p>
-              <p>BOTON IZQ: ROTAR CÁMARA</p>
-              <p>SCROLL: ZOOM +/-</p>
-              <p>HOVER: IDENTIFICAR COMPONENTE</p>
-           </div>
-
-           {hoveredLabel && (
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pixel-border !bg-black text-white p-6 font-pixel text-[10px] pointer-events-none z-20 border-white shadow-[0_0_20px_rgba(255,0,0,0.5)]">
-                <div className="text-primary mb-2 text-[8px] uppercase">COMPONENTE DETECTADO</div>
-                {hoveredLabel}
-             </div>
-           )}
-           
-           <div className="absolute bottom-6 right-6 font-pixel text-[6px] text-primary/40">RENDER_MODE: PIXEL_8BIT_LEGACY</div>
-        </div>
-
-        <footer className="p-6 border-t-8 border-black bg-white flex justify-between items-center">
-           <div className="flex gap-4">
-              <div className="h-6 w-12 bg-primary border-4 border-black"></div>
-              <div className="h-6 w-12 bg-black border-4 border-black"></div>
-              <div className="h-6 w-12 bg-slate-300 border-4 border-black"></div>
-           </div>
-           <div className="text-right">
-              <span className="font-pixel text-[8px] text-black">POLO TECNOLÓGICO LA RIOJA</span>
-              <p className="font-pixel text-[6px] text-slate-400 mt-1">SISTEMA_VIRTUAL_READY</p>
-           </div>
-        </footer>
+        <div className="flex-1 relative" ref={mountRef}></div>
       </div>
     </div>
   );
